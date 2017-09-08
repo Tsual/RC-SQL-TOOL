@@ -44,13 +44,27 @@ namespace RC_SQL_TOOL
 
         private void button2_Click(object sender, EventArgs e)
         {
-            string sPath = "";
-            FolderBrowserDialog folder = new FolderBrowserDialog();
-            folder.Description = "选择所有文件存放目录";
-            if (folder.ShowDialog() == DialogResult.OK)
-                sPath = folder.SelectedPath;
-            SqlConfig.initSqlConfig();
-            SqlExcuter.Excute(strFileNames, sPath);
+            try
+            {
+                string sPath = "";
+                FolderBrowserDialog folder = new FolderBrowserDialog();
+                folder.Description = "选择所有文件存放目录";
+                if (folder.ShowDialog() == DialogResult.OK)
+                    sPath = folder.SelectedPath;
+                SqlConfig.initSqlConfig();
+                SqlExcuter.Excute(strFileNames, sPath);
+
+                System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo("Explorer.exe")
+                {
+                    Arguments = "/e,/select," + sPath + @"\Insert\"
+                };
+                System.Diagnostics.Process.Start(psi);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
+
         }
     }
 }

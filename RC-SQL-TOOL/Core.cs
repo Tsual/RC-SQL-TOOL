@@ -37,7 +37,7 @@ namespace RC_SQL_TOOL
 
         public string SqlRollbackDelete()
         {
-            return "delete " + BaseTarget + "." + TableName + " t where t." + _pairs[0].Key + " = " + _pairs[0].Value + ";";
+            return "delete " + BaseTarget + "." + TableName + " t where t." + _pairs[0].Key + " in (" + _pairs[0].Value + ");";
         }
 
         public string SqlInsert()
@@ -232,6 +232,18 @@ namespace RC_SQL_TOOL
             return resSet;
         }
 
+        static string formatstr = '"' + @"`~!@#$%^&*()_+-=[]\;',-../{}|:<>?" + @"·【】、；‘，。/~！@#￥%……&*（）——+{}|：“”《》？ " + "\r\n";
+
+
+        private static bool CheckEncoding(string str)
+        {
+            foreach (var t in str)
+                if (!((t >= 0x4E00 && t <= 0x9FCB) || (t >= 0x30 && t <= 0x39) || (t >= 0x61 && t <= 0x7a) || (t >= 0x41 && t <= 0x5a) || formatstr.Contains(t)))
+                    return false;
+            return true;
+        }
+
+
         /// <summary>
         /// 自动切换GBK或UTF-8编码 去除注释
         /// </summary>
@@ -245,12 +257,11 @@ namespace RC_SQL_TOOL
                 while (!fis.EndOfStream)
                 {
                     var str = fis.ReadLine();
-                    for (int i = 0; i < str.Length - 3; i++)
-                        if (str[i] == 239 && str[i] == 191 && str[i] == 189)
-                        {
-                            fis.Dispose();
-                            return preLoad(filepath, Encoding.GetEncoding("GBK"));
-                        }
+                    if (!CheckEncoding(str))
+                    {
+                        fis.Dispose();
+                        return preLoad(filepath, Encoding.GetEncoding("GBK"));
+                    }
                     resSet.Add(str);
                 }
             }
@@ -263,7 +274,15 @@ namespace RC_SQL_TOOL
             using (var fis = new StreamReader(filepath, encoding))
             {
                 while (!fis.EndOfStream)
-                    resSet.Add(fis.ReadLine());
+                {
+                    string str = fis.ReadLine();
+                    if (!CheckEncoding(str))
+                    {
+                        fis.Dispose();
+                        return preLoad(filepath, Encoding.GetEncoding("GB2312"));
+                    }
+                    resSet.Add(str);
+                }
             }
             return ExecLines(resSet);
         }
@@ -401,9 +420,9 @@ namespace RC_SQL_TOOL
             removelist = new List<string>();
             int combingtarget = 0;
             int combinecount = 0;
-            for(int i=0;i<strs2.Length;i++)
+            for (int i = 0; i < strs2.Length; i++)
             {
-                if(combinecount>0)
+                if (combinecount > 0)
                 {
                     removelist.Add(strs2[i]);
                     strs2[combingtarget] += "," + strs2[i];
@@ -426,11 +445,11 @@ namespace RC_SQL_TOOL
                     }
                 }
             }
-            List<string> tttt = strs2.ToList();
+            List<string> strs2RemoveList = strs2.ToList();
             foreach (var t in removelist)
-                tttt.Remove(t);
-            strs2 = tttt.ToArray();
-            
+                strs2RemoveList.Remove(t);
+            strs2 = strs2RemoveList.ToArray();
+
 
 
 
@@ -447,7 +466,7 @@ namespace RC_SQL_TOOL
             return res;
         }
 
-        private static IEnumerable<string> combinValue(char s1, char s2,IEnumerable<string> strs)
+        private static IEnumerable<string> combinValue(char s1, char s2, IEnumerable<string> strs)
         {
             var templis = strs.ToList();
             List<string> removelist = new List<string>();
@@ -490,6 +509,8 @@ namespace RC_SQL_TOOL
             return templis;
         }
 
+
+        public static List<KeyValuePair<string, List<SqlRow>>> OrderPairs = null;
         /// <summary>
         /// 将insert转化成sql对象
         /// </summary>
@@ -500,6 +521,42 @@ namespace RC_SQL_TOOL
             List<SqlRow> resSet = new List<SqlRow>();
             foreach (var t in inserts)
                 resSet.Add(SplitSingleInsert(t));
+
+
+            OrderPairs = new List<KeyValuePair<string, List<SqlRow>>>();
+            List<SqlRow> errList = new List<SqlRow>();
+            foreach (var t in resSet)
+            {
+                bool findtable = false;
+                foreach (var tt in OrderPairs)
+                    if (tt.Key == t.TableName)
+                    {
+                        findtable = true;
+                        bool finddata = false;
+                        foreach (var ttt in tt.Value)
+
+                            if (ttt.PairCollection[0].Value == t.PairCollection[0].Value)
+                            {
+                                finddata = true;
+                                errList.Add(t);
+                                break;
+                            }
+
+                        if (!finddata)
+                            tt.Value.Add(t);
+                    }
+                if (!findtable)
+                    OrderPairs.Add(new KeyValuePair<string, List<SqlRow>>(t.TableName, new List<SqlRow>() { t }));
+            }
+
+            if (errList.Count > 0)
+            {
+                string mes = "";
+                foreach (var t in errList)
+                    mes += "Error Unique at " + t.BaseTarget + "." + t.TableName + "." + t.PairCollection[0] + "\n";
+                throw new Exception(mes);
+            }
+
             return resSet;
         }
 
@@ -531,8 +588,8 @@ namespace RC_SQL_TOOL
         {
             string res = "declare a int;b int; begin b:=0;";
             foreach (var t in sqls)
-                res += "select count(1) into a from( " + t.SqlSelect1() + ");b:=a+b;";
-            res += @"if b = " + sqls.Count() + " then dbms_output.put_line('true') ;else dbms_output.put_line('false'); end if;end;";
+                res += "select count(1) into a from( " + t.SqlSelect1() + ");b:=a+b; if a=0 then dbms_output.put_line('Error at " + t.BaseTarget + "." + t.TableName + "." + t.PairCollection[0] + "');else dbms_output.put_line('Pass " + t.BaseTarget + "." + t.TableName + "." + t.PairCollection[0] + "');end if;";
+            res += @"if b = " + sqls.Count() + " then dbms_output.put_line('Check Result:True') ;else dbms_output.put_line('Check Result:False'); end if;end;";
             return res;
         }
 
@@ -541,125 +598,124 @@ namespace RC_SQL_TOOL
             int f_index = -1;
             //try
             //{
-                foreach (var filepath in filepaths)
+            foreach (var filepath in filepaths)
+            {
+                f_index++;
+
+
+                if (!Directory.Exists(filesavepath + "\\Rollback"))
+                    Directory.CreateDirectory(filesavepath + "\\Rollback");
+
+                List<string> basekinds = new List<string>();
+                var r1 = SqlExcuter.preLoad(filepath);
+                var r2 = SqlExcuter.SplitString(r1);
+                var r3 = SqlExcuter.SplitInsert(r2);
+
+                foreach (var t in r3)
+                    if (!basekinds.Contains(t.BaseTarget))
+                        basekinds.Add(t.BaseTarget);
+
+                int g_index = -1;
+                foreach (var t in basekinds)
                 {
-                    f_index++;
+                    g_index++;
+                    var baseconfigs = from t2 in SqlConfig.Origin.List
+                                      where t2.BaseName == t
+                                      select t2;
+                    if (baseconfigs.Count() < 1)
+                        throw new Exception("config error");
+                    var baseconfig = baseconfigs.ElementAt(0);
 
+                    var res = from t1 in r3
+                              where t1.BaseTarget == t
+                              select t1;
 
-
-                    if (!Directory.Exists(filesavepath + "\\Rollback"))
-                        Directory.CreateDirectory(filesavepath + "\\Rollback");
-
-                    List<string> basekinds = new List<string>();
-                    var r1 = SqlExcuter.preLoad(filepath);
-                    var r2 = SqlExcuter.SplitString(r1);
-                    var r3 = SqlExcuter.SplitInsert(r2);
-
-                    foreach (var t in r3)
-                        if (!basekinds.Contains(t.BaseTarget))
-                            basekinds.Add(t.BaseTarget);
-
-                    int g_index = -1;
-                    foreach (var t in basekinds)
+                    var r4 = SqlExcuter.CreateInsert(res);
+                    if (!Directory.Exists(filesavepath + "\\Insert"))
+                        Directory.CreateDirectory(filesavepath + "\\Insert");
+                    string insertname = f_index + "_" + g_index + "_" + baseconfig.BaseFileNameg + "_INSERT_TSK_" + SqlConfig.Origin.Name + "_" + SqlConfig.Origin.Phone + "_配置脚本.sql";
+                    using (Stream s = File.Create(filesavepath + "\\Insert\\" + insertname))
                     {
-                        g_index++;
-                        var baseconfigs = from t2 in SqlConfig.Origin.List
-                                          where t2.BaseName == t
-                                          select t2;
-                        if (baseconfigs.Count() < 1)
-                            throw new Exception("config error");
-                        var baseconfig = baseconfigs.ElementAt(0);
-
-                        var res = from t1 in r3
-                                  where t1.BaseTarget == t
-                                  select t1;
-
-                        var r4 = SqlExcuter.CreateInsert(res);
-                        if (!Directory.Exists(filesavepath + "\\Insert"))
-                            Directory.CreateDirectory(filesavepath + "\\Insert");
-                        string insertname = f_index + "_" + g_index + "_" + baseconfig.BaseFileNameg + "_TSK_" + SqlConfig.Origin.Name + "_" + SqlConfig.Origin.Phone + "_配置脚本.sql";
-                        using (Stream s = File.OpenWrite(filesavepath + "\\Insert\\" + insertname))
+                        using (StreamWriter sw = new StreamWriter(s))
                         {
-                            using (StreamWriter sw = new StreamWriter(s))
+                            List<string> heads = new List<string>() { "--目标数据库:" + baseconfig.PublicBaseName, "--脚本说明：", "--父脚本：无", "--提前执行：是", "set define off;", "alter session set current_schema = " + baseconfig.BaseName + ";" };
+                            foreach (var t4 in heads)
                             {
-                                List<string> heads = new List<string>() { "--目标数据库:" + baseconfig.PublicBaseName, "--脚本说明：", "--父脚本：无", "--提前执行：是", "set define off;", "alter session set current_schema = " + baseconfig.BaseName + ";" };
-                                foreach (var t4 in heads)
-                                {
-                                    sw.WriteLine(t4);
-                                }
-                                foreach (var t4 in r4)
-                                {
-                                    sw.WriteLine(t4);
-                                }
+                                sw.WriteLine(t4);
                             }
-
-                        }
-
-                        var r5 = SqlExcuter.CreateReset(res);
-                        if (!Directory.Exists(filesavepath + "\\Reset"))
-                            Directory.CreateDirectory(filesavepath + "\\Reset");
-                        string resetname = f_index + "_" + g_index + "_" + baseconfig.BaseFileNameg + "_INSERT__TSK_" + SqlConfig.Origin.Name + "_" + SqlConfig.Origin.Phone + "_重置脚本.sql";
-                        using (Stream s = File.OpenWrite(filesavepath + "\\Reset\\" + resetname))
-                        {
-                            using (StreamWriter sw = new StreamWriter(s))
+                            foreach (var t4 in r4)
                             {
-                                List<string> heads = new List<string>() { "--目标数据库:" + baseconfig.PublicBaseName, "--脚本说明：", "--父脚本：无", "--提前执行：是", "set define off;", "alter session set current_schema = " + baseconfig.BaseName + ";" };
-                                foreach (var t4 in heads)
-                                {
-                                    sw.WriteLine(t4);
-                                }
-                                foreach (var t4 in r5)
-                                {
-                                    sw.WriteLine(t4);
-                                }
+                                sw.WriteLine(t4);
                             }
-
-                        }
-
-                        var r6 = SqlExcuter.CreateRollback(res);
-
-                        if (!Directory.Exists(filesavepath + "\\Rollback"))
-                            Directory.CreateDirectory(filesavepath + "\\Rollback");
-                        string rollbackname = f_index + "_" + g_index + "_" + baseconfig.BaseFileNameg + "_DELETE_TSK_" + SqlConfig.Origin.Name + "_" + SqlConfig.Origin.Phone + "_回退脚本.sql";
-                        using (Stream s = File.OpenWrite(filesavepath + "\\Rollback\\" + rollbackname))
-                        {
-                            using (StreamWriter sw = new StreamWriter(s))
-                            {
-                                List<string> heads = new List<string>() { "--目标数据库:" + baseconfig.PublicBaseName, "--脚本说明：", "--父脚本：无", "--提前执行：是", "set define off;", "alter session set current_schema = " + baseconfig.BaseName + ";" };
-                                foreach (var t4 in heads)
-                                {
-                                    sw.WriteLine(t4);
-                                }
-                                foreach (var t4 in r6)
-                                {
-                                    sw.WriteLine(t4);
-                                }
-                            }
-
-                        }
-
-                        var r7 = SqlExcuter.CreateCheck(res);
-                        if (!Directory.Exists(filesavepath + "\\Check"))
-                            Directory.CreateDirectory(filesavepath + "\\Check");
-                        string checkname = f_index + "_" + g_index + "_" + baseconfig.BaseFileNameg + "_SELECT_TSK_" + SqlConfig.Origin.Name + "_" + SqlConfig.Origin.Phone + "_检查脚本.sql";
-                        using (Stream s = File.OpenWrite(filesavepath + "\\Check\\" + checkname))
-                        {
-                            using (StreamWriter sw = new StreamWriter(s))
-                            {
-                                List<string> heads = new List<string>() { "--目标数据库:" + baseconfig.PublicBaseName, "--脚本说明：", "--父脚本：无", "--提前执行：是", "set define off;", "alter session set current_schema = " + baseconfig.BaseName + ";" };
-                                foreach (var t4 in heads)
-                                {
-                                    sw.WriteLine(t4);
-                                }
-                                sw.WriteLine(r7);
-                            }
-
-
                         }
 
                     }
 
+                    var r5 = SqlExcuter.CreateReset(res);
+                    if (!Directory.Exists(filesavepath + "\\Reset"))
+                        Directory.CreateDirectory(filesavepath + "\\Reset");
+                    string resetname = f_index + "_" + g_index + "_" + baseconfig.BaseFileNameg + "_UPDATE_TSK_" + SqlConfig.Origin.Name + "_" + SqlConfig.Origin.Phone + "_重置脚本.sql";
+                    using (Stream s = File.Create(filesavepath + "\\Reset\\" + resetname))
+                    {
+                        using (StreamWriter sw = new StreamWriter(s))
+                        {
+                            List<string> heads = new List<string>() { "--目标数据库:" + baseconfig.PublicBaseName, "--脚本说明：", "--父脚本：无", "--提前执行：是", "set define off;", "alter session set current_schema = " + baseconfig.BaseName + ";" };
+                            foreach (var t4 in heads)
+                            {
+                                sw.WriteLine(t4);
+                            }
+                            foreach (var t4 in r5)
+                            {
+                                sw.WriteLine(t4);
+                            }
+                        }
+
+                    }
+
+                    var r6 = SqlExcuter.CreateRollback(res);
+
+                    if (!Directory.Exists(filesavepath + "\\Rollback"))
+                        Directory.CreateDirectory(filesavepath + "\\Rollback");
+                    string rollbackname = f_index + "_" + g_index + "_" + baseconfig.BaseFileNameg + "_DELETE_TSK_" + SqlConfig.Origin.Name + "_" + SqlConfig.Origin.Phone + "_回退脚本.sql";
+                    using (Stream s = File.Create(filesavepath + "\\Rollback\\" + rollbackname))
+                    {
+                        using (StreamWriter sw = new StreamWriter(s))
+                        {
+                            List<string> heads = new List<string>() { "--目标数据库:" + baseconfig.PublicBaseName, "--脚本说明：", "--父脚本：无", "--提前执行：是", "set define off;", "alter session set current_schema = " + baseconfig.BaseName + ";" };
+                            foreach (var t4 in heads)
+                            {
+                                sw.WriteLine(t4);
+                            }
+                            foreach (var t4 in r6)
+                            {
+                                sw.WriteLine(t4);
+                            }
+                        }
+
+                    }
+
+                    var r7 = SqlExcuter.CreateCheck(res);
+                    if (!Directory.Exists(filesavepath + "\\Check"))
+                        Directory.CreateDirectory(filesavepath + "\\Check");
+                    string checkname = f_index + "_" + g_index + "_" + baseconfig.BaseFileNameg + "_SELECT_TSK_" + SqlConfig.Origin.Name + "_" + SqlConfig.Origin.Phone + "_检查脚本.sql";
+                    using (Stream s = File.Create(filesavepath + "\\Check\\" + checkname))
+                    {
+                        using (StreamWriter sw = new StreamWriter(s))
+                        {
+                            List<string> heads = new List<string>() { "--目标数据库:" + baseconfig.PublicBaseName, "--脚本说明：", "--父脚本：无", "--提前执行：是", "set define off;", "alter session set current_schema = " + baseconfig.BaseName + ";" };
+                            foreach (var t4 in heads)
+                            {
+                                sw.WriteLine(t4);
+                            }
+                            sw.WriteLine(r7);
+                        }
+
+
+                    }
+
                 }
+
+            }
 
             //}
             //catch (Exception e)
