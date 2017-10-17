@@ -70,7 +70,7 @@ namespace RC_SQL_TOOL
             }
 
             res += tempstr.Substring(1);
-            res += " where " + _pairs[0].Key + " = " + _pairs[0].Key + ";";
+            res += " where " + _pairs[0].Key + " = " + _pairs[0].Value + ";";
 
             return res;
         }

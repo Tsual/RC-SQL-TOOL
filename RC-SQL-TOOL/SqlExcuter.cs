@@ -31,7 +31,7 @@ namespace RC_SQL_TOOL
                     else
                     {
                         isinnotes = false;
-                        if (str.Length > 2)
+                        if (str.Length >= 2)
                             str = str.Substring(notesendindex + 2);
                     }
                 }
@@ -41,7 +41,12 @@ namespace RC_SQL_TOOL
                 //处理多行注释头部
                 int notesstartindex = str.IndexOf(@"/*");
                 if (notesstartindex >= 0)
-                    isfindhead = true;
+                {
+                    isinnotes = true;
+                    resSet.Add("");
+                    continue;
+                }
+                    
 
                 //处理单行注释
                 int onenote = str.IndexOf("--");
@@ -60,7 +65,7 @@ namespace RC_SQL_TOOL
 
                     else
                     {
-                        isinnotes = false;
+                        isfindhead = false;
                         if (str.Length > 2)
                             str = str.Substring(notesendindex + 2);
                     }
@@ -194,6 +199,7 @@ namespace RC_SQL_TOOL
 
         private static SqlRow SplitSingleInsert(string insertsql)
         {
+            string oriinsert = insertsql;
             SqlRow res = new SqlRow();
             int targetindex = insertsql.IndexOf('.');
             int baseindex = 0;
@@ -247,7 +253,7 @@ namespace RC_SQL_TOOL
                     int count = 0;
                     foreach (var t in templis[i])
                         if (t == ')') count++;
-                    if (count > 0 && count <= templis_token)
+                    if (count >= 0 && count <= templis_token)
                     {
                         templis_token -= count;
                         templis[appendtarget] += "," + templis[i];
@@ -313,7 +319,7 @@ namespace RC_SQL_TOOL
 
 
 
-            if (strs1.Length != strs2.Length) throw new Exception("sql syntax error");
+            if (strs1.Length != strs2.Length) throw new Exception("sql items count dismatch at: "+ oriinsert);
 
             for (int i = 0; i < strs1.Length; i++)
             {
@@ -495,8 +501,8 @@ namespace RC_SQL_TOOL
                 Form1.ObjectReference?.SendInfo("Read sql file");
 
                 foreach (var t in r3)
-                    if (!basekinds.Contains(SqlConfig.Current.getBaseFileName(t.BaseTarget)))
-                        basekinds.Add(SqlConfig.Current.getBaseFileName(t.BaseTarget));
+                    if (!basekinds.Contains(t.BaseTarget))
+                        basekinds.Add(t.BaseTarget);
 
 
                 int g_index = -1;
@@ -504,7 +510,7 @@ namespace RC_SQL_TOOL
                 {
                     g_index++;
                     var baseconfigs = from t2 in SqlConfig.Current.List
-                                      where t2.BaseFileNameg == t
+                                      where t2.BaseName == t
                                       select t2;
                     if (baseconfigs.Count() < 1)
                         throw new Exception("config error");
@@ -512,7 +518,7 @@ namespace RC_SQL_TOOL
 
 
                     var res = from t1 in r3
-                              where SqlConfig.Current.getBaseFileName(t1.BaseTarget) == t
+                              where t1.BaseTarget == t
                               select t1;
 
                     Form1.ObjectReference?.SendInfo("Output filepath"+ filesavepath);
