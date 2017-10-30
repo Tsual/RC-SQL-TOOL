@@ -32,7 +32,7 @@ namespace RC_SQL_TOOL
 
         public string SqlRollbackDelete()
         {
-            return "delete " + BaseTarget + "." + TableName + " t where t." + _pairs[0].Key + " in (" + _pairs[0].Value + ");";
+            return (!SqlConfig.Current.PKignoreTable.Contains(TableName.ToLower()))?"delete " + BaseTarget + "." + TableName + " t where t." + _pairs[0].Key + " in (" + _pairs[0].Value + ");":"";
         }
 
         public string SqlInsert()
@@ -68,10 +68,13 @@ namespace RC_SQL_TOOL
                 if (_pairs[i].Value == "''" || _pairs[i].Value == "null" || _pairs[i].Key.Contains("date") || _pairs[i].Value.ToLower() == "sysdate") continue;
                 tempstr += "," + _pairs[i].Key + " = " + _pairs[i].Value;
             }
-
-            res += tempstr.Substring(1);
-            res += " where " + _pairs[0].Key + " = " + _pairs[0].Value + ";";
-
+            if (!SqlConfig.Current.PKignoreTable.Contains(TableName.ToLower()))
+            {
+                res += tempstr.Substring(1);
+                res += " where " + _pairs[0].Key + " = " + _pairs[0].Value + ";";
+            }
+            else
+                res = "";
             return res;
         }
 

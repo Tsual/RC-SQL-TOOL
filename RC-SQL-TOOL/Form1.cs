@@ -73,6 +73,7 @@ namespace RC_SQL_TOOL
 
         private void button2_Click(object sender, EventArgs e)
         {
+            
             try
             {
                 string sPath = "";
@@ -91,12 +92,32 @@ namespace RC_SQL_TOOL
                     Arguments = "/e,/select," + sPath + @"\Insert\"
                 };
                 System.Diagnostics.Process.Start(psi);
+                SqlConfig.SaveConfig();
             }
             catch (Exception ex)
             {
                 SendInfo(ex.Message);
             }
-
+            
+            /*
+            string sPath = "";
+            FolderBrowserDialog folder = new FolderBrowserDialog();
+            folder.Description = "选择所有文件存放目录";
+            if (folder.ShowDialog() == DialogResult.OK)
+                sPath = folder.SelectedPath;
+            if (sPath == "")
+            {
+                SendInfo("folder select none");
+                return;
+            }
+            SqlExcuter.Excute(strFileNames, sPath);
+            System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo("Explorer.exe")
+            {
+                Arguments = "/e,/select," + sPath + @"\Insert\"
+            };
+            System.Diagnostics.Process.Start(psi);
+            SqlConfig.SaveConfig();
+            */
         }
     }
 }

@@ -398,24 +398,19 @@ namespace RC_SQL_TOOL
                     if (tt.Key == t.TableName)
                     {
                         findtable = true;
-                        bool finddata = false;
                         foreach (var ttt in tt.Value)
-
-                            if (ttt.PairCollection[0].Value == t.PairCollection[0].Value && ttt.BaseTarget == t.BaseTarget)
+                            if (ttt.PairCollection[0].Value == t.PairCollection[0].Value && ttt.BaseTarget == t.BaseTarget && !SqlConfig.Current.PKignoreTable.Contains(ttt.TableName.ToLower()))
                             {
-                                finddata = true;
                                 errList.Add(t);
                                 break;
                             }
-
-                        if (!finddata)
-                            tt.Value.Add(t);
+                        tt.Value.Add(t);
                     }
                 if (!findtable)
                     OrderPairs.Add(new KeyValuePair<string, List<SqlRow>>(t.TableName, new List<SqlRow>() { t }));
             }
 
-            if (errList.Count > 0)
+            if (errList.Count > 0 )
             {
                 string mes = "";
                 foreach (var t in errList)
@@ -467,10 +462,10 @@ namespace RC_SQL_TOOL
 
         public static string CreateCheck(IEnumerable<SqlRow> sqls)
         {
-            string res = "declare a int;b int; begin b:=0;\n";
+            string res = "declare a int;b int; begin b:=0;";
             foreach (var t in sqls)
                 res += "\n  select count(1) into a from( " + t.SqlSelect1() + ");b:=a+b;\n      if a=0 then dbms_output.put_line('Error at " + t.BaseTarget + "." + t.TableName + "." + t.PairCollection[0] + "');else dbms_output.put_line('Pass " + t.BaseTarget + "." + t.TableName + "." + t.PairCollection[0] + "');end if;";
-            res += "\n      if b = " + sqls.Count() + " then dbms_output.put_line('Check Result:True') ;else dbms_output.put_line('Check Result:False'); end if;end;";
+            res += "\nif b = " + sqls.Count() + " then dbms_output.put_line('Check Result:True') ;else dbms_output.put_line('Check Result:False'); end if;end;";
             return res;
         }
         #endregion

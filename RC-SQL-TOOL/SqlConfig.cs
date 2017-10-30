@@ -11,7 +11,6 @@ namespace RC_SQL_TOOL
 {
     public class SqlConfig : ISqlConfig
     {
-        
         /// <summary>
         /// SqlConfig实例对象
         /// </summary>
@@ -54,6 +53,9 @@ namespace RC_SQL_TOOL
 
         [XmlIgnore]
         private string _FormatSymbol="";
+
+        [XmlIgnore]
+        private List<string> _PKignoreTable = new List<string>();
         #endregion
 
 
@@ -63,6 +65,7 @@ namespace RC_SQL_TOOL
         public InsertSortMode InsertSqlSortMode { get => _InsertSqlSortMode; set => _InsertSqlSortMode = value; }
         public List<BaseConfig> List { get => _List; set => _List = value; }
         public string FormatSymbol { get => _FormatSymbol; set => _FormatSymbol = value; }
+        public List<string> PKignoreTable { get => _PKignoreTable; set => _PKignoreTable = value; }
 
         #endregion
 
@@ -86,16 +89,7 @@ namespace RC_SQL_TOOL
             }
             if (InitMode == SqlConfigInitMode.New || (InitMode == SqlConfigInitMode.Default && !File.Exists(_StartupPath + "\\config.xml")))
             {
-                using (Stream s = File.Create(_StartupPath + "\\config.xml"))
-                {
-                    using (StreamWriter sw = new StreamWriter(s))
-                    {
-                        if(_Current==null)
-                        sw.WriteLine(Serialize(CreateEmptyConfig()));
-                        else
-                            sw.WriteLine(Serialize(_Current));
-                    }
-                }
+                SaveConfig();
             }
             if(InitMode==SqlConfigInitMode.WatchingModify)
             {
@@ -115,6 +109,20 @@ namespace RC_SQL_TOOL
                     Form1.ObjectReference?.SendInfo(ex.Message);
                 }
 
+            }
+        }
+
+        public static void SaveConfig()
+        {
+            using (Stream s = File.Create(Application.StartupPath + "\\config.xml"))
+            {
+                using (StreamWriter sw = new StreamWriter(s))
+                {
+                    if (_Current == null)
+                        sw.WriteLine(Serialize(CreateEmptyConfig()));
+                    else
+                        sw.WriteLine(Serialize(_Current));
+                }
             }
         }
 
@@ -140,9 +148,14 @@ namespace RC_SQL_TOOL
         {
             try
             {
-                XmlSerializer serobj = new XmlSerializer(typeof(SqlConfig));
+                var serobj = new XmlSerializer(typeof(SqlConfig));
                 var vm = new MemoryStream(Encoding.UTF8.GetBytes(str));
-                return serobj.Deserialize(vm) as SqlConfig;
+                var sqlconfig= serobj.Deserialize(vm) as SqlConfig;
+                var tstrs = new List<string>();
+                foreach (var t in sqlconfig._PKignoreTable)
+                    tstrs.Add(t.ToLower());
+                sqlconfig._PKignoreTable = tstrs;
+                return sqlconfig;
             }
             //处理并预读文件 保证配置正确
             catch (Exception)
@@ -165,6 +178,7 @@ namespace RC_SQL_TOOL
             {
                 _Name = "名字",
                 _Phone = "手机号",
+                _PKignoreTable = { "bs_para_detail" },
                 _InsertSqlSortMode = InsertSortMode.Original,
                 _FormatSymbol = '"' + @"`~!@#$%^&*()_+-=[]\;',-../{}|:<>?" + @"·【】、；‘，。/~！@#￥%……&*（）——+{}|：“”《》？ " + "\r\n"
             };
