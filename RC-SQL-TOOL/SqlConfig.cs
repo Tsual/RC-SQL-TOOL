@@ -180,7 +180,7 @@ namespace RC_SQL_TOOL
                 _Phone = "手机号",
                 _PKignoreTable = { "bs_para_detail" },
                 _InsertSqlSortMode = InsertSortMode.Original,
-                _FormatSymbol = '"' + @"`~!@#$%^&*()_+-=[]\;',-../{}|:<>?" + @"·【】、；‘，。/~！@#￥%……&*（）——+{}|：“”《》？ " + "\r\n"
+                _FormatSymbol = '"' + @"`~!@#$%^&*()_+-=[]\;',-../{}|:<>?" + @"·【】、；‘，。/~！@#￥%……&*（）——+{}|：“”《》？ " + "\r\n\t"
             };
             Origin._List.Add(new BaseConfig()
             {

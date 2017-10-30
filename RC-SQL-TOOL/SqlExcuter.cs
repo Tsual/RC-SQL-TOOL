@@ -80,7 +80,9 @@ namespace RC_SQL_TOOL
         }
 
 
-        private enum SupportEncoding { UTF8, GBK, GB2312 }
+
+
+        private static string[] SupportEncoding = { "UTF-8", "GBK", "GB2312" };
 
         /// <summary>
         /// 用于阻止溢栈
@@ -103,8 +105,8 @@ namespace RC_SQL_TOOL
         /// <returns>以IEnumerable<string>形式返回处理后的文件</returns>
         private static IEnumerable<string> preLoad(string filepath)
         {
-            RecursiveCount++;
-            if (RecursiveCount > Enum.GetValues(typeof(SupportEncoding)).Length) return null;
+            RecursiveCount=1;
+            if (RecursiveCount > SupportEncoding.Length+1) return null;
             List<string> resSet = new List<string>();
             using (var fis = new StreamReader(new FileStream(filepath, FileMode.Open)))
             {
@@ -114,7 +116,7 @@ namespace RC_SQL_TOOL
                     if (!CheckEncoding(str))
                     {
                         fis.Dispose();
-                        return preLoad(filepath, Encoding.GetEncoding("GBK"));
+                        return preLoad(filepath, Encoding.GetEncoding(SupportEncoding[RecursiveCount%3]));
                     }
                     resSet.Add(str);
                 }
@@ -129,17 +131,20 @@ namespace RC_SQL_TOOL
         private static IEnumerable<string> preLoad(string filepath, Encoding encoding)
         {
             RecursiveCount++;
-            if (RecursiveCount > Enum.GetValues(typeof(SupportEncoding)).Length) return null;
+            if (RecursiveCount > SupportEncoding.Length+1) return null;
             List<string> resSet = new List<string>();
             using (var fis = new StreamReader(filepath, encoding))
             {
                 while (!fis.EndOfStream)
                 {
                     string str = fis.ReadLine();
-                    if (!CheckEncoding(str))
+                    if(RecursiveCount != SupportEncoding.Length+1)
                     {
-                        fis.Dispose();
-                        return preLoad(filepath, Encoding.GetEncoding("GB2312"));
+                        if (!CheckEncoding(str))
+                        {
+                            fis.Dispose();
+                            return preLoad(filepath, Encoding.GetEncoding(SupportEncoding[RecursiveCount % 3]));
+                        }
                     }
                     resSet.Add(str);
                 }

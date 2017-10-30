@@ -98,8 +98,8 @@ namespace RC_SQL_TOOL
             {
                 SendInfo(ex.Message);
             }
-            
             /*
+            
             string sPath = "";
             FolderBrowserDialog folder = new FolderBrowserDialog();
             folder.Description = "选择所有文件存放目录";
