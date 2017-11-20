@@ -46,7 +46,7 @@ namespace RC_SQL_TOOL
                     resSet.Add("");
                     continue;
                 }
-                    
+
 
                 //处理单行注释
                 int onenote = str.IndexOf("--");
@@ -105,8 +105,8 @@ namespace RC_SQL_TOOL
         /// <returns>以IEnumerable<string>形式返回处理后的文件</returns>
         private static IEnumerable<string> preLoad(string filepath)
         {
-            RecursiveCount=1;
-            if (RecursiveCount > SupportEncoding.Length+1) return null;
+            RecursiveCount = 1;
+            if (RecursiveCount > SupportEncoding.Length + 1) return null;
             List<string> resSet = new List<string>();
             using (var fis = new StreamReader(new FileStream(filepath, FileMode.Open)))
             {
@@ -116,7 +116,7 @@ namespace RC_SQL_TOOL
                     if (!CheckEncoding(str))
                     {
                         fis.Dispose();
-                        return preLoad(filepath, Encoding.GetEncoding(SupportEncoding[RecursiveCount%3]));
+                        return preLoad(filepath, Encoding.GetEncoding(SupportEncoding[RecursiveCount % 3]));
                     }
                     resSet.Add(str);
                 }
@@ -131,14 +131,14 @@ namespace RC_SQL_TOOL
         private static IEnumerable<string> preLoad(string filepath, Encoding encoding)
         {
             RecursiveCount++;
-            if (RecursiveCount > SupportEncoding.Length+1) return null;
+            if (RecursiveCount > SupportEncoding.Length + 1) return null;
             List<string> resSet = new List<string>();
             using (var fis = new StreamReader(filepath, encoding))
             {
                 while (!fis.EndOfStream)
                 {
                     string str = fis.ReadLine();
-                    if(RecursiveCount != SupportEncoding.Length+1)
+                    if (RecursiveCount != SupportEncoding.Length + 1)
                     {
                         if (!CheckEncoding(str))
                         {
@@ -152,7 +152,7 @@ namespace RC_SQL_TOOL
             return ExecLines(resSet);
         }
 
-        public class FileEncodingExcption:Exception
+        public class FileEncodingExcption : Exception
         {
             public override string Message => "File Encoding Error";
         }
@@ -324,7 +324,7 @@ namespace RC_SQL_TOOL
 
 
 
-            if (strs1.Length != strs2.Length) throw new Exception("sql items count dismatch at: "+ oriinsert);
+            if (strs1.Length != strs2.Length) throw new Exception("sql items count dismatch at: " + oriinsert);
 
             for (int i = 0; i < strs1.Length; i++)
             {
@@ -415,7 +415,7 @@ namespace RC_SQL_TOOL
                     OrderPairs.Add(new KeyValuePair<string, List<SqlRow>>(t.TableName, new List<SqlRow>() { t }));
             }
 
-            if (errList.Count > 0 )
+            if (errList.Count > 0)
             {
                 string mes = "";
                 foreach (var t in errList)
@@ -430,6 +430,8 @@ namespace RC_SQL_TOOL
                 {
                     foreach (var tt in t.Value)
                     {
+                        tt.BaseTarget = tt.BaseTarget.ToLower();
+                        tt.TableName = tt.TableName.ToLower();
                         resSet.Add(tt);
                     }
                 }
@@ -480,18 +482,20 @@ namespace RC_SQL_TOOL
         /// </summary>
         /// <param name="filepaths">源文件路径</param>
         /// <param name="filesavepath">目标文件路径</param>
-        public static void Excute(IEnumerable<string> filepaths, string filesavepath)
+        public static void Excute(IEnumerable<string> filepaths, ref string filesavepath)
         {
             int f_index = -1;
+            Random ran = new Random();
+            while (Directory.Exists(filesavepath))
+                filesavepath = filesavepath + "\\" + DateTime.Now.Day + DateTime.Now.Hour + DateTime.Now.Minute + DateTime.Now.Second + "_" + ran.Next();
+            Directory.CreateDirectory(filesavepath);
+
             //try
             //{
             foreach (var filepath in filepaths)
             {
                 f_index++;
-
-
-                if (!Directory.Exists(filesavepath + "\\Rollback"))
-                    Directory.CreateDirectory(filesavepath + "\\Rollback");
+                var file_name = filepath.Substring(filepath.LastIndexOf("\\") + 1);
 
                 List<string> basekinds = new List<string>();
                 var r1 = SqlExcuter.preLoad(filepath);
@@ -510,7 +514,7 @@ namespace RC_SQL_TOOL
                 {
                     g_index++;
                     var baseconfigs = from t2 in SqlConfig.Current.List
-                                      where t2.BaseName == t
+                                      where t2.BaseName.ToLower() == t.ToLower()
                                       select t2;
                     if (baseconfigs.Count() < 1)
                         throw new Exception("config error");
@@ -521,12 +525,14 @@ namespace RC_SQL_TOOL
                               where t1.BaseTarget == t
                               select t1;
 
-                    Form1.ObjectReference?.SendInfo("Output filepath"+ filesavepath);
+
+
+                    Form1.ObjectReference?.SendInfo("Output filepath" + filesavepath);
                     var r4 = SqlExcuter.CreateInsert(res);
                     if (!Directory.Exists(filesavepath + "\\Insert"))
                         Directory.CreateDirectory(filesavepath + "\\Insert");
-                    string insertname = f_index + "_" + g_index + "_" + baseconfig.BaseFileNameg + "_INSERT_TSK_" + SqlConfig.Current.Name + "_" + SqlConfig.Current.Phone + "_配置脚本.sql";
-                    using (Stream s = File.Create(filesavepath + "\\Insert\\" + insertname))
+                    string insertname = f_index + "_" + g_index + "_" + baseconfig.BaseFileNameg + "_INSERT_TSK_" + SqlConfig.Current.Name + "_" + SqlConfig.Current.Phone + "_配置脚本";
+                    using (Stream s = File.Create(filesavepath + "\\Insert\\" + insertname + " " + file_name))
                     {
                         using (StreamWriter sw = new StreamWriter(s))
                         {
@@ -546,8 +552,8 @@ namespace RC_SQL_TOOL
                     var r5 = SqlExcuter.CreateReset(res);
                     if (!Directory.Exists(filesavepath + "\\Reset"))
                         Directory.CreateDirectory(filesavepath + "\\Reset");
-                    string resetname = f_index + "_" + g_index + "_" + baseconfig.BaseFileNameg + "_UPDATE_TSK_" + SqlConfig.Current.Name + "_" + SqlConfig.Current.Phone + "_重置脚本.sql";
-                    using (Stream s = File.Create(filesavepath + "\\Reset\\" + resetname))
+                    string resetname = f_index + "_" + g_index + "_" + baseconfig.BaseFileNameg + "_UPDATE_TSK_" + SqlConfig.Current.Name + "_" + SqlConfig.Current.Phone + "_重置脚本";
+                    using (Stream s = File.Create(filesavepath + "\\Reset\\" + resetname + " " + file_name))
                     {
                         using (StreamWriter sw = new StreamWriter(s))
                         {
@@ -568,8 +574,8 @@ namespace RC_SQL_TOOL
 
                     if (!Directory.Exists(filesavepath + "\\Rollback"))
                         Directory.CreateDirectory(filesavepath + "\\Rollback");
-                    string rollbackname = f_index + "_" + g_index + "_" + baseconfig.BaseFileNameg + "_DELETE_TSK_" + SqlConfig.Current.Name + "_" + SqlConfig.Current.Phone + "_回退脚本.sql";
-                    using (Stream s = File.Create(filesavepath + "\\Rollback\\" + rollbackname))
+                    string rollbackname = f_index + "_" + g_index + "_" + baseconfig.BaseFileNameg + "_DELETE_TSK_" + SqlConfig.Current.Name + "_" + SqlConfig.Current.Phone + "_回退脚本";
+                    using (Stream s = File.Create(filesavepath + "\\Rollback\\" + rollbackname + " " + file_name))
                     {
                         using (StreamWriter sw = new StreamWriter(s))
                         {
@@ -589,8 +595,8 @@ namespace RC_SQL_TOOL
                     var r7 = SqlExcuter.CreateCheck(res);
                     if (!Directory.Exists(filesavepath + "\\Check"))
                         Directory.CreateDirectory(filesavepath + "\\Check");
-                    string checkname = f_index + "_" + g_index + "_" + baseconfig.BaseFileNameg + "_SELECT_TSK_" + SqlConfig.Current.Name + "_" + SqlConfig.Current.Phone + "_检查脚本.sql";
-                    using (Stream s = File.Create(filesavepath + "\\Check\\" + checkname))
+                    string checkname = f_index + "_" + g_index + "_" + baseconfig.BaseFileNameg + "_SELECT_TSK_" + SqlConfig.Current.Name + "_" + SqlConfig.Current.Phone + "_检查脚本";
+                    using (Stream s = File.Create(filesavepath + "\\Check\\" + checkname + " " + file_name))
                     {
                         using (StreamWriter sw = new StreamWriter(s))
                         {
@@ -604,7 +610,7 @@ namespace RC_SQL_TOOL
 
 
                     }
-                    Form1.ObjectReference?.SendInfo("Output complete" );
+                    Form1.ObjectReference?.SendInfo("Output complete");
                 }
 
             }
